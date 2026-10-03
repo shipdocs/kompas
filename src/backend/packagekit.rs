@@ -32,6 +32,28 @@ struct TransactionPackage {
     summary: String,
 }
 
+// Use PackageKit's actual update candidates, not installed-version IDs or
+// Resolve(NotInstalled), which excludes the packages the user wants to update.
+fn update_package_ids(
+    requested: &[&str],
+    available: &[TransactionPackage],
+) -> Result<Vec<String>, String> {
+    let mut ids = Vec::new();
+    for package in available {
+        let name = package.package_id.split(';').next().unwrap_or_default();
+        if requested.contains(&name) && !ids.contains(&package.package_id) {
+            ids.push(package.package_id.clone());
+        }
+    }
+    if ids.is_empty() {
+        return Err(
+            "No pending updates were found for the selected packages. Refresh the updates list and try again."
+                .into(),
+        );
+    }
+    Ok(ids)
+}
+
 struct TransactionProgress {
     package_id: String,
     status: u32,
@@ -467,7 +489,7 @@ impl Backend for Packagekit {
             let tx = self.transaction()?;
             log::info!("resolve packages for {:?}", package_names);
             let filter = match &op.kind {
-                OperationKind::Install | OperationKind::Update => {
+                OperationKind::Install => {
                     FilterKind::NotInstalled as u64
                         | FilterKind::Newest as u64
                         | FilterKind::Arch as u64
@@ -476,13 +498,23 @@ impl Backend for Packagekit {
                 // Other operations not supported
                 _ => 0,
             };
-            tx.resolve(filter, &package_names)?;
+            if matches!(op.kind, OperationKind::Update) {
+                tx.get_updates(FilterKind::None as u64)?;
+            } else {
+                tx.resolve(filter, &package_names)?;
+            }
             transaction_handle(tx, |_, _| {})?
         };
-        let mut package_ids = Vec::with_capacity(package_names.len());
-        for tx_package in tx_packages.iter() {
-            package_ids.push(tx_package.package_id.as_str());
-        }
+        let selected_updates;
+        let package_ids: Vec<&str> = if matches!(op.kind, OperationKind::Update) {
+            selected_updates = update_package_ids(&package_names, &tx_packages)?;
+            selected_updates.iter().map(String::as_str).collect()
+        } else {
+            tx_packages
+                .iter()
+                .map(|package| package.package_id.as_str())
+                .collect()
+        };
         let tx = self.transaction()?;
         tx.set_hints(&["interactive=true"])?;
         match &op.kind {
@@ -541,5 +573,50 @@ impl Backend for Packagekit {
 
     fn is_package_available(&self, pkgnames: &[String]) -> bool {
         self.is_package_available(pkgnames)
+    }
+}
+
+#[cfg(test)]
+mod update_tests {
+    use super::{TransactionPackage, update_package_ids};
+
+    fn package(id: &str) -> TransactionPackage {
+        TransactionPackage {
+            info: 0,
+            package_id: id.into(),
+            summary: String::new(),
+        }
+    }
+
+    #[test]
+    fn updates_use_available_versions_and_exclude_unselected_packages() {
+        let available = vec![
+            package("kompas;0.2;amd64;updates"),
+            package("other;3;amd64;updates"),
+        ];
+        assert_eq!(
+            update_package_ids(&["kompas"], &available).unwrap(),
+            vec!["kompas;0.2;amd64;updates"]
+        );
+    }
+
+    #[test]
+    fn updates_preserve_installed_multiarch_candidates_without_duplicates() {
+        let available = vec![
+            package("libexample;2;amd64;updates"),
+            package("libexample;2;i386;updates"),
+            package("libexample;2;amd64;updates"),
+        ];
+        assert_eq!(
+            update_package_ids(&["libexample"], &available).unwrap().len(),
+            2
+        );
+    }
+
+    #[test]
+    fn stale_update_selection_reports_no_pending_updates() {
+        assert!(
+            update_package_ids(&["kompas"], &[package("other;3;amd64;updates")]).is_err()
+        );
     }
 }

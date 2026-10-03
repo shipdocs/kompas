@@ -21,7 +21,7 @@ jobs:
         timeout-minutes: 6
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
-          sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y xvfb x11-utils xdotool imagemagick dbus-x11 mesa-vulkan-drivers libgl1-mesa-dri build-essential dpkg-dev desktop-file-utils appstream gnome-software pkg-config apt-config-icons apt-config-icons-hidpi apt-config-icons-large apt-config-icons-large-hidpi adwaita-icon-theme libflatpak-dev libssl-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev libegl1-mesa-dev
+          sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y xvfb x11-utils xdotool imagemagick dbus-x11 mesa-vulkan-drivers libgl1-mesa-dri build-essential dpkg-dev desktop-file-utils python3-xlib appstream gnome-software pkg-config apt-config-icons apt-config-icons-hidpi apt-config-icons-large apt-config-icons-large-hidpi adwaita-icon-theme libflatpak-dev libssl-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev libegl1-mesa-dev
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
 
       - name: Install Rust
@@ -137,7 +137,7 @@ jobs:
           path: smoke-artifacts/
           if-no-files-found: ignore
 
-  publish-first-preview:
+  publish-preview:
     needs: lint
     if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
     runs-on: ubuntu-24.04
@@ -155,9 +155,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # A fixed first-preview tag: later development pushes never move it.
-          if gh release view v0.1.0-preview.1 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'The first preview is already published.'
+          # A fixed preview tag: later development pushes never move it.
+          if gh release view v0.1.0-preview.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo 'This preview is already published.'
             exit 0
           fi
           cd preview
@@ -166,7 +166,7 @@ jobs:
           test "${#packages[@]}" -eq 1
           cp "${packages[0]}" kompas-preview-amd64.deb
           sha256sum kompas-preview-amd64.deb > SHA256SUMS
-          gh release create v0.1.0-preview.1 kompas-preview-amd64.deb SHA256SUMS \
+          gh release create v0.1.0-preview.2 kompas-preview-amd64.deb SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title 'Kompas 0.1.0 — First public preview' \
-            --notes-file ../docs/releases/v0.1.0-preview.1.md
+            --title 'Kompas 0.1.0 — Updates and window shutdown fixes' \
+            --notes-file ../docs/releases/v0.1.0-preview.2.md

@@ -7,6 +7,7 @@ Exec=kompas %u
 Terminal=false
 Type=Application
 StartupNotify=true
+StartupWMClass=app.shipdocs.Kompas
 Icon=app.shipdocs.Kompas
 Categories=System;PackageManager;
 Keywords=App;Software;Store;Shop;

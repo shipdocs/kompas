@@ -410,20 +410,25 @@ pub fn handle_operation_message(app: &mut App, message: Message) -> Task<Message
             Task::none()
         }
         Message::PendingComplete(id) => {
+            let maybe_exit = Task::done(action::app(Message::MaybeExit));
             if let Some((op, _)) = app.pending_operations.remove(&id) {
                 app.progress_operations.remove(&id);
                 match &op.kind {
                     OperationKind::RepositoryAdd(_) | OperationKind::RepositoryRemove(_, _) => {
                         app.repos_changing
                             .retain(|(backend_name, _repo_id, _)| backend_name != &op.backend_name);
-                        return app.update_backends(true);
+                        return Task::batch([app.update_backends(true), maybe_exit]);
                     }
                     _ => {
-                        return Task::batch(vec![app.update_installed(), app.update_updates()]);
+                        return Task::batch([
+                            app.update_installed(),
+                            app.update_updates(),
+                            maybe_exit,
+                        ]);
                     }
                 }
             }
-            Task::none()
+            maybe_exit
         }
         Message::PendingError(id, _err) => {
             app.progress_operations.remove(&id);
@@ -437,7 +442,7 @@ pub fn handle_operation_message(app: &mut App, message: Message) -> Task<Message
                 }
             }
             app.dialog_pages.push_back(DialogPage::FailedOperation(id));
-            Task::none()
+            Task::done(action::app(Message::MaybeExit))
         }
         Message::PendingProgress(id, progress) => {
             if let Some((_, p)) = app.pending_operations.get_mut(&id) {

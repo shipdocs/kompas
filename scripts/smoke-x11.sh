@@ -113,3 +113,28 @@ sleep 2
 grep -q 'subcategory selected: 0' "$output/startup.log"
 import -window "$window_id" "$output/back-to-games.png"
 kill -0 "$app_pid"
+
+# Send the same WM_DELETE_WINDOW request as a desktop window manager.
+WINDOW_ID="$window_id" python3 - <<'PY_CLOSE'
+import os
+from Xlib import X, display, protocol
+connection = display.Display()
+window = connection.create_resource_object('window', int(os.environ['WINDOW_ID'], 0))
+window.send_event(protocol.event.ClientMessage(
+    window=window,
+    client_type=connection.intern_atom('WM_PROTOCOLS'),
+    data=(32, [connection.intern_atom('WM_DELETE_WINDOW'), X.CurrentTime, 0, 0, 0]),
+), event_mask=0)
+connection.flush()
+connection.close()
+PY_CLOSE
+for attempt in $(seq 1 10); do
+    if ! kill -0 "$app_pid" 2>/dev/null; then break; fi
+    sleep 1
+done
+if kill -0 "$app_pid" 2>/dev/null; then
+    echo 'Kompas remained running after its main window was closed.' >&2
+    exit 1
+fi
+wait "$app_pid"
+echo 'Window-manager close request terminated Kompas.'

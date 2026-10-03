@@ -1721,6 +1721,10 @@ impl Application for App {
         Some(Message::WindowClose)
     }
 
+    fn on_close_requested(&self, id: window::Id) -> Option<Message> {
+        (self.core.main_window_id() == Some(id)).then_some(Message::WindowClose)
+    }
+
     fn on_escape(&mut self) -> Task<Message> {
         if self.core.window.show_context {
             // Close context drawer if open
