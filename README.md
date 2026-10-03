@@ -20,8 +20,8 @@ sudo apt install ./kompas_*.deb
 ```
 
 Open **Kompas** from the application menu or run `kompas`. Installation replaces
-the previous `cosmic-store` package automatically. Preview packages
-use a stripped debug build; release optimization can follow user testing.
+the previous `cosmic-store` package automatically. Packages
+are optimized release builds with debug symbols stripped.
 The SHA256SUMS file accompanies each package. The installed package is exercised
 under X11 by CI before the workflow succeeds.
 
@@ -51,7 +51,7 @@ system and the page after installation; those are distinct checks.
 - **Unified discovery**: System/Zorin packages, Flatpak and Steam with source selection, Linux-native filtering and consistent sorting.
 - **Complete browsing**: Progressive “Show more” browsing through the loaded catalog, result counts and recoverable empty states.
 - **Game launchers**: Discover Steam and Heroic (Epic/GOG); Steam game pages help install the client before handing over installation.
-- **Performance**: AppStream data is parsed in the background and icons are cached. Preview packages are unoptimized stripped debug builds, so startup and search are slower than a release build will be.
+- **Performance**: AppStream data is parsed in the background and icons are cached. Release packages are optimized builds; a debug build from `cargo build` is several times slower.
 
 ## How discovery works
 

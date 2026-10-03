@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# Package an already built binary for Zorin 18 / Ubuntu 24.04 testing.
+# Package an already built (release) binary for Zorin 18 / Ubuntu 24.04 testing.
 set -euo pipefail
-binary=${1:-target/debug/kompas}
+binary=${1:-target/release/kompas}
 output=${2:-dist}
 test -x "$binary"
 mkdir -p "$output"
