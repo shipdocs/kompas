@@ -163,7 +163,10 @@ jobs:
           tag=$(basename "$notes" .md)
           title=$(head -n 1 "$notes" | sed 's/^# *//')
           # A tag with a suffix (v0.1.0-preview.N) is a prerelease; a plain vX.Y.Z is not.
-          case "$tag" in *-*) channel=--prerelease ;; *) channel=--latest ;; esac
+          case "$tag" in
+            *-*) channel=--prerelease; asset=kompas-preview-amd64.deb ;;
+            *) channel=--latest; asset=kompas-amd64.deb ;;
+          esac
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::notice::$tag is already published; add docs/releases/<next tag>.md to publish another preview."
             exit 0
@@ -172,9 +175,9 @@ jobs:
           sha256sum -c SHA256SUMS
           packages=( *.deb )
           test "${#packages[@]}" -eq 1
-          cp "${packages[0]}" kompas-preview-amd64.deb
-          sha256sum kompas-preview-amd64.deb > SHA256SUMS
-          gh release create "$tag" kompas-preview-amd64.deb SHA256SUMS \
+          cp "${packages[0]}" "$asset"
+          sha256sum "$asset" > SHA256SUMS
+          gh release create "$tag" "$asset" SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" "$channel" \
             --title "$title" \
             --notes-file "../$notes"
