@@ -63,6 +63,8 @@ struct TransactionProgress {
 /// A PackageKit transaction whose signals are subscribed to before it can start.
 /// Subscribing after the first method call loses fast `ErrorCode` and `Finished`
 /// signals (for example a refused authorization), which left the UI at 0% forever.
+/// Always consume `signals` (see `transaction_handle`): an unread subscription fills
+/// up on busy transactions and blocks the shared D-Bus connection.
 struct PkTransaction<'a> {
     proxy: TransactionProxyBlocking<'a>,
     signals: Box<dyn Iterator<Item = Arc<packagekit_zbus::zbus::Message>>>,
@@ -265,10 +267,11 @@ impl Packagekit {
         log::info!("Building available packages cache from PackageKit...");
         let start = Instant::now();
 
-        let tx = self.transaction()?;
-        // Subscribe before starting: fast cached transactions can otherwise finish
-        // before the signal handler is attached, leaving discovery waiting forever.
-        let signals = tx.receive_all_signals()?;
+        // The transaction is already subscribed to its signals, so a fast cached
+        // transaction cannot finish before we listen. Use exactly that one
+        // subscription: a second, unread one would fill up while get_packages emits
+        // tens of thousands of signals and stall the whole D-Bus connection.
+        let PkTransaction { proxy: tx, signals } = self.transaction()?;
         tx.get_packages(FilterKind::Arch as u64)?;
         // Availability needs raw names only, without app cards or icon loading.
         let mut available = HashSet::new();
