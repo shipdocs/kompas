@@ -5,13 +5,13 @@ use crate::app_info::WaylandCompatibility;
 use rust_embed::RustEmbed;
 
 const STATS_URL_V8: &str =
-    "https://github.com/shipdocs/kompas/releases/latest/download/flathub-stats.bitcode-v0-8";
+    "https://github.com/shipdocs/kompas/releases/download/latest/flathub-stats.bitcode-v0-8";
 const STATS_URL: &str =
-    "https://github.com/shipdocs/kompas/releases/latest/download/flathub-stats.bitcode-v0-7";
+    "https://github.com/shipdocs/kompas/releases/download/latest/flathub-stats.bitcode-v0-7";
 const METADATA_URL: &str =
-    "https://github.com/shipdocs/kompas/releases/latest/download/flathub-metadata.json";
-const STATS_CACHE_PATH_V8: &str = "cosmic-store/flathub-stats.bitcode";
-const METADATA_CACHE_PATH: &str = "cosmic-store/flathub-metadata.json";
+    "https://github.com/shipdocs/kompas/releases/download/latest/flathub-metadata.json";
+const STATS_CACHE_PATH_V8: &str = "flathub-stats.bitcode";
+const METADATA_CACHE_PATH: &str = "flathub-metadata.json";
 const CACHE_MAX_AGE_SECS: u64 = 30 * 24 * 60 * 60; // 30 days
 
 #[derive(RustEmbed)]
@@ -43,17 +43,37 @@ struct FlathubStats {
 
 static STATS: OnceLock<FlathubStats> = OnceLock::new();
 
+fn cache_file(name: &str) -> Option<std::path::PathBuf> {
+    Some(
+        dirs::cache_dir()?
+            .join(crate::constants::CACHE_DIR)
+            .join(name),
+    )
+}
+
 fn get_cache_path_v8() -> Option<std::path::PathBuf> {
-    Some(dirs::cache_dir()?.join(STATS_CACHE_PATH_V8))
+    cache_file(STATS_CACHE_PATH_V8)
 }
 
 fn get_cache_path_v7() -> Option<std::path::PathBuf> {
-    Some(dirs::cache_dir()?.join("cosmic-store/flathub-stats.bitcode-v0-7"))
+    cache_file("flathub-stats.bitcode-v0-7")
+}
+
+/// Plain GET with timeouts so a stalled network cannot block startup indefinitely.
+fn http_get(url: &str) -> Option<reqwest::blocking::Response> {
+    reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .connect_timeout(std::time::Duration::from_secs(5))
+        .build()
+        .ok()?
+        .get(url)
+        .send()
+        .ok()
 }
 
 fn try_fetch_remote_metadata() -> Option<StatsMetadata> {
     log::debug!("fetching remote metadata from {}", METADATA_URL);
-    let response = reqwest::blocking::get(METADATA_URL).ok()?;
+    let response = http_get(METADATA_URL)?;
     if !response.status().is_success() {
         log::warn!("failed to fetch metadata: {}", response.status());
         return None;
@@ -62,7 +82,7 @@ fn try_fetch_remote_metadata() -> Option<StatsMetadata> {
 }
 
 fn try_load_cached_metadata() -> Option<StatsMetadata> {
-    let cache_path = dirs::cache_dir()?.join(METADATA_CACHE_PATH);
+    let cache_path = cache_file(METADATA_CACHE_PATH)?;
     let data = std::fs::read_to_string(&cache_path).ok()?;
     serde_json::from_str(&data).ok()
 }
@@ -151,13 +171,13 @@ fn download_and_cache() -> Option<Vec<u8>> {
     log::info!("downloading flathub statistics...");
 
     // 1. Fetch metadata (optional, but preferred)
-    let metadata_content = match reqwest::blocking::get(METADATA_URL) {
-        Ok(resp) if resp.status().is_success() => resp.text().ok(),
+    let metadata_content = match http_get(METADATA_URL) {
+        Some(resp) if resp.status().is_success() => resp.text().ok(),
         _ => None,
     };
 
     // 2. Try download v0-8
-    let (bytes, version) = if let Ok(resp) = reqwest::blocking::get(STATS_URL_V8) {
+    let (bytes, version) = if let Some(resp) = http_get(STATS_URL_V8) {
         if resp.status().is_success() {
             if let Ok(b) = resp.bytes() {
                 (Some(b.to_vec()), 8)
@@ -167,7 +187,7 @@ fn download_and_cache() -> Option<Vec<u8>> {
         } else {
             // Fallback to v0-7
             log::warn!("v0-8 download failed ({}). trying v0-7...", resp.status());
-            if let Ok(resp7) = reqwest::blocking::get(STATS_URL) {
+            if let Some(resp7) = http_get(STATS_URL) {
                 if resp7.status().is_success() {
                     (resp7.bytes().ok().map(|b| b.to_vec()), 7)
                 } else {
@@ -182,33 +202,36 @@ fn download_and_cache() -> Option<Vec<u8>> {
     };
 
     let bytes = bytes?;
+    // Never cache a payload that cannot be decoded (for example an error page).
+    let decodes = match version {
+        8 => decode_v8(&bytes).is_some(),
+        _ => decode_v7(&bytes).is_some(),
+    };
+    if !decodes {
+        log::warn!("downloaded v0-{} stats could not be decoded", version);
+        return None;
+    }
     log::info!("downloaded v0-{} stats ({} bytes)", version, bytes.len());
 
     // 3. Cache files (only if download succeeded)
     if version == 8 {
         // Write v0-8 bitcode
         if let Some(cache_path) = get_cache_path_v8() {
-            if let Some(parent) = cache_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::write(&cache_path, &bytes);
+            crate::utils::write_cache_file(&cache_path, &bytes);
             log::info!("cached v0-8 stats to {:?}", cache_path);
         }
 
         // Write metadata if available
         if let Some(meta_json) = metadata_content {
-            if let Some(cache_path) = dirs::cache_dir().map(|p| p.join(METADATA_CACHE_PATH)) {
-                let _ = std::fs::write(&cache_path, meta_json);
+            if let Some(cache_path) = cache_file(METADATA_CACHE_PATH) {
+                crate::utils::write_cache_file(&cache_path, meta_json.as_bytes());
                 log::info!("cached metadata");
             }
         }
     } else if version == 7 {
         // Write v0-7 bitcode
         if let Some(cache_path) = get_cache_path_v7() {
-            if let Some(parent) = cache_path.parent() {
-                let _ = std::fs::create_dir_all(parent);
-            }
-            let _ = std::fs::write(&cache_path, &bytes);
+            crate::utils::write_cache_file(&cache_path, &bytes);
             log::info!("cached v0-7 stats to {:?}", cache_path);
         }
         // Don't write metadata for v7 as it might mismatch v8 format

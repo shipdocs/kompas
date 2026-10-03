@@ -34,6 +34,13 @@ for attempt in $(seq 1 75); do
 done
 grep -Eq 'local catalog ready: [1-9][0-9]* results' "$output/startup.log"
 sleep 2
+# iced creates a hidden bootstrap window; it must be gone once the real window exists,
+# or desktops that ignore the hidden flag list a stray "winit window".
+if xwininfo -root -tree | grep -q '"winit window"'; then
+    xwininfo -root -tree | grep 'winit window' >&2
+    echo 'A stray bootstrap window ("winit window") is still open.' >&2
+    exit 1
+fi
 kill -0 "$app_pid"
 import -window "$window_id" "$output/store-x11.png"
 test -s "$output/store-x11.png"

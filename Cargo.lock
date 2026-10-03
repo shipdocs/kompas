@@ -1247,48 +1247,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "kompas"
-version = "0.1.0"
-dependencies = [
- "appstream",
- "atomicwrites",
- "bitcode",
- "chrono",
- "clap",
- "cosmic-panel-config",
- "dirs",
- "env_logger",
- "flate2",
- "freedesktop_entry_parser",
- "i18n-embed",
- "i18n-embed-fl",
- "icu_collator",
- "icu_locale",
- "libc",
- "libcosmic",
- "libflatpak",
- "log",
- "logind-zbus",
- "nix 0.30.1",
- "notify-rust",
- "open",
- "packagekit-zbus",
- "paste",
- "rayon",
- "regex",
- "reqwest",
- "rust-embed",
- "serde",
- "serde_json",
- "serde_yaml",
- "spdx",
- "sys-locale",
- "tokio",
- "xdg",
- "zbus 5.12.0",
-]
-
-[[package]]
 name = "cosmic-text"
 version = "0.15.0"
 source = "git+https://github.com/pop-os/cosmic-text.git#7051682e70defcab6b683d6e9db07124a6de0df7"
@@ -3006,7 +2964,6 @@ dependencies = [
 [[package]]
 name = "iced_winit"
 version = "0.14.0-dev"
-source = "git+https://github.com/pop-os/libcosmic.git#3b8ad45950f5d23c8550e18e628f6e70b7089d89"
 dependencies = [
  "cosmic-client-toolkit",
  "dnd",
@@ -3457,6 +3414,48 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d463f34ca3c400fde3a054da0e0b8c6ffa21e4590922f3e18281bb5eeef4cbdc"
 dependencies = [
  "windows-sys 0.61.2",
+]
+
+[[package]]
+name = "kompas"
+version = "0.1.0"
+dependencies = [
+ "appstream",
+ "atomicwrites",
+ "bitcode",
+ "chrono",
+ "clap",
+ "cosmic-panel-config",
+ "dirs",
+ "env_logger",
+ "flate2",
+ "freedesktop_entry_parser",
+ "i18n-embed",
+ "i18n-embed-fl",
+ "icu_collator",
+ "icu_locale",
+ "libc",
+ "libcosmic",
+ "libflatpak",
+ "log",
+ "logind-zbus",
+ "nix 0.30.1",
+ "notify-rust",
+ "open",
+ "packagekit-zbus",
+ "paste",
+ "rayon",
+ "regex",
+ "reqwest",
+ "rust-embed",
+ "serde",
+ "serde_json",
+ "serde_yaml",
+ "spdx",
+ "sys-locale",
+ "tokio",
+ "xdg",
+ "zbus 5.12.0",
 ]
 
 [[package]]

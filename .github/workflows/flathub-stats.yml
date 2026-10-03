@@ -79,19 +79,23 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # Get current date for release tag
           DATE=$(date +%Y-%m-%d)
-          
-          # Delete existing 'latest' tag and release if it exists
-          gh release delete latest --yes || true
-          git push origin :refs/tags/latest || true
-          
-          # Create new release with 'latest' tag
-          gh release create latest \
-            --title "Flathub Stats (Latest)" \
-            --notes "Automatically generated Flathub statistics - Generated on ${DATE}" \
-            res/flathub-stats.bitcode-v0-8 \
-            res/flathub-metadata.json
+
+          # Kompas downloads these assets from the fixed 'latest' tag. Update the
+          # release in place so the download URL never 404s between delete and create.
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest --clobber \
+              res/flathub-stats.bitcode-v0-8 \
+              res/flathub-metadata.json
+            gh release edit latest \
+              --notes "Automatically generated Flathub statistics - Generated on ${DATE}"
+          else
+            gh release create latest \
+              --title "Flathub Stats (Latest)" \
+              --notes "Automatically generated Flathub statistics - Generated on ${DATE}" \
+              res/flathub-stats.bitcode-v0-8 \
+              res/flathub-metadata.json
+          fi
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
