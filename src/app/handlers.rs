@@ -1111,11 +1111,10 @@ pub fn subscription(app: &App) -> Subscription<Message> {
         }
     }
 
+    // `progress_operations` only drives the progress notification and already contains
+    // every pending id; skipping those here would mean no operation ever starts.
+    // The subscription id keeps iced from starting an operation twice.
     for (id, (op, _progress)) in app.pending_operations.iter() {
-        if app.progress_operations.contains(id) {
-            continue;
-        }
-
         let id = *id;
         let op = op.clone();
         //let msg_tx = app.core.message_sender.clone();

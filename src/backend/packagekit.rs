@@ -60,13 +60,30 @@ struct TransactionProgress {
     percentage: u32,
 }
 
+/// A PackageKit transaction whose signals are subscribed to before it can start.
+/// Subscribing after the first method call loses fast `ErrorCode` and `Finished`
+/// signals (for example a refused authorization), which left the UI at 0% forever.
+struct PkTransaction<'a> {
+    proxy: TransactionProxyBlocking<'a>,
+    signals: Box<dyn Iterator<Item = Arc<packagekit_zbus::zbus::Message>>>,
+}
+
+impl<'a> std::ops::Deref for PkTransaction<'a> {
+    type Target = TransactionProxyBlocking<'a>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.proxy
+    }
+}
+
 fn transaction_handle(
-    tx: TransactionProxyBlocking,
+    tx: PkTransaction,
     mut on_progress: impl FnMut(u32, TransactionProgress),
 ) -> Result<(Vec<TransactionDetails>, Vec<TransactionPackage>), Box<dyn Error>> {
     let mut details = Vec::new();
     let mut packages = Vec::new();
-    for signal in tx.receive_all_signals()? {
+    let PkTransaction { proxy: tx, signals } = tx;
+    for signal in signals {
         if let Some(member) = signal.member() {
             match member.as_str() {
                 "Details" => {
@@ -321,7 +338,7 @@ impl Packagekit {
         }
     }
 
-    fn transaction(&self) -> Result<TransactionProxyBlocking<'_>, Box<dyn Error>> {
+    fn transaction(&self) -> Result<PkTransaction<'_>, Box<dyn Error>> {
         //TODO: use async?
         let pk = PackageKitProxyBlocking::new(&self.connection)?;
         //TODO: set locale?
@@ -330,13 +347,15 @@ impl Packagekit {
             .destination("org.freedesktop.PackageKit")?
             .path(tx_path)?
             .build()?;
-        Ok(tx)
+        // Subscribe before any method can start the transaction.
+        let signals = tx.receive_all_signals()?;
+        Ok(PkTransaction {
+            proxy: tx,
+            signals: Box::new(signals),
+        })
     }
 
-    fn package_transaction(
-        &self,
-        tx: TransactionProxyBlocking,
-    ) -> Result<Vec<Package>, Box<dyn Error>> {
+    fn package_transaction(&self, tx: PkTransaction) -> Result<Vec<Package>, Box<dyn Error>> {
         let appstream_cache = &self.appstream_caches[0];
 
         let (tx_details, tx_packages) = transaction_handle(tx, |_, _| {})?;
