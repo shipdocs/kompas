@@ -32,6 +32,8 @@
       link.href = safeUrl(release.html_url) || releasesUrl;
     });
     const date = new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(release.published_at));
+    const badge = document.getElementById('release-badge');
+    if (badge) badge.textContent = `${release.prerelease ? 'Preview' : release.tag_name} · Zorin & Ubuntu`;
     status.textContent = `${release.tag_name} · ${release.prerelease ? 'Preview' : 'Stable'} · ${date} · ${(deb.size / 1048576).toFixed(1)} MB`;
     document.getElementById('install-command').textContent = `sudo apt install ./${deb.name}\nkompas`;
     const list = document.createElement('ul');
