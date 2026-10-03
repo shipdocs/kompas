@@ -608,15 +608,15 @@ mod update_tests {
             package("libexample;2;amd64;updates"),
         ];
         assert_eq!(
-            update_package_ids(&["libexample"], &available).unwrap().len(),
+            update_package_ids(&["libexample"], &available)
+                .unwrap()
+                .len(),
             2
         );
     }
 
     #[test]
     fn stale_update_selection_reports_no_pending_updates() {
-        assert!(
-            update_package_ids(&["kompas"], &[package("other;3;amd64;updates")]).is_err()
-        );
+        assert!(update_package_ids(&["kompas"], &[package("other;3;amd64;updates")]).is_err());
     }
 }
