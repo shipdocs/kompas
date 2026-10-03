@@ -114,6 +114,7 @@ pub enum Message {
     UpdateAll,
     Updates(Vec<(&'static str, Package)>),
     WindowClose,
+    WindowCloseRequested(cosmic::iced::window::Id),
     WindowNew,
     SelectPlacement(cosmic::widget::segmented_button::Entity),
     PlaceApplet(AppId),

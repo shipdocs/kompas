@@ -890,6 +890,11 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 app.core.window.show_context = true;
             }
         }
+        Message::WindowCloseRequested(id) => {
+            if app.core.main_window_id() == Some(id) {
+                return update(app, Message::WindowClose);
+            }
+        }
         Message::WindowClose => {
             if let Some(window_id) = app.core.main_window_id() {
                 app.core.set_main_window_id(None);
@@ -1021,7 +1026,10 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
 
 pub fn subscription(app: &App) -> Subscription<Message> {
     let mut subscriptions = vec![
-        cosmic::iced::event::listen_with(|event, status, _window_id| match event {
+        cosmic::iced::event::listen_with(|event, status, window_id| match event {
+            cosmic::iced::event::Event::Window(window::Event::CloseRequested) => {
+                Some(Message::WindowCloseRequested(window_id))
+            }
             cosmic::iced::event::Event::Keyboard(cosmic::iced::keyboard::Event::KeyPressed {
                 key,
                 modifiers,
