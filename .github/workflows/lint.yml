@@ -151,13 +151,18 @@ jobs:
         with:
           name: kompas-zorin-preview-amd64
           path: preview
-      - name: Publish the tested first preview once
+      - name: Publish the tested preview once per release notes file
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # A fixed preview tag: later development pushes never move it.
-          if gh release view v0.1.0-preview.2 --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-            echo 'This preview is already published.'
+          # The newest docs/releases/vX.Y.Z-preview.N.md names the tag, title and notes.
+          # Adding a new notes file is all that is needed to publish the next preview;
+          # later development pushes never move an already published tag.
+          notes=$(ls docs/releases/v*.md | sort -V | tail -n 1)
+          tag=$(basename "$notes" .md)
+          title=$(head -n 1 "$notes" | sed 's/^# *//')
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::notice::$tag is already published; add docs/releases/<next tag>.md to publish another preview."
             exit 0
           fi
           cd preview
@@ -166,7 +171,7 @@ jobs:
           test "${#packages[@]}" -eq 1
           cp "${packages[0]}" kompas-preview-amd64.deb
           sha256sum kompas-preview-amd64.deb > SHA256SUMS
-          gh release create v0.1.0-preview.2 kompas-preview-amd64.deb SHA256SUMS \
+          gh release create "$tag" kompas-preview-amd64.deb SHA256SUMS \
             --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" --prerelease \
-            --title 'Kompas 0.1.0 — Updates and window shutdown fixes' \
-            --notes-file ../docs/releases/v0.1.0-preview.2.md
+            --title "$title" \
+            --notes-file "../$notes"

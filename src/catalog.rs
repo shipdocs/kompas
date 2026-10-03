@@ -5,22 +5,46 @@ use crate::app_info::{AppInfo, AppScreenshot, AppUrl};
 use crate::search::SearchResult;
 use rayon::prelude::*;
 use serde_json::Value;
-use std::{collections::HashSet, error::Error, fs, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    collections::HashSet,
+    error::Error,
+    fs,
+    path::PathBuf,
+    sync::{Arc, OnceLock},
+    time::Duration,
+};
 
 pub const STEAM: &str = "steam";
 pub const NATIVE_LINUX: &str = "X-ShipDocs-NativeLinux";
 pub const NEW_RELEASE: &str = "X-ShipDocs-NewRelease";
 
+/// Storefront region used for displayed prices.
+const REGION: &str = "nl";
+
+/// One shared client, so connections are reused across requests and threads.
 fn client() -> Result<reqwest::blocking::Client, reqwest::Error> {
-    reqwest::blocking::Client::builder()
+    static CLIENT: OnceLock<reqwest::blocking::Client> = OnceLock::new();
+    if let Some(client) = CLIENT.get() {
+        return Ok(client.clone());
+    }
+    let client = reqwest::blocking::Client::builder()
         .timeout(Duration::from_secs(8))
         .connect_timeout(Duration::from_secs(3))
         .user_agent("Kompas/0.1")
-        .build()
+        .build()?;
+    Ok(CLIENT.get_or_init(|| client).clone())
+}
+
+fn cache_file(relative: &str) -> Option<PathBuf> {
+    Some(
+        dirs::cache_dir()?
+            .join(crate::constants::CACHE_DIR)
+            .join(relative),
+    )
 }
 
 fn cache_path() -> Option<PathBuf> {
-    Some(dirs::cache_dir()?.join("cosmic-store/steam-featured-v4.json"))
+    cache_file("steam-featured-v4.json")
 }
 
 pub fn steam_id(info: &AppInfo) -> Option<u64> {
@@ -58,8 +82,7 @@ fn validated_item(client: &reqwest::blocking::Client, item: &Value) -> Option<Va
     if id == 0 {
         return None;
     }
-    let path =
-        dirs::cache_dir().map(|p| p.join(format!("cosmic-store/steam-metadata-v3/{id}.json")));
+    let path = cache_file(&format!("steam-metadata-v3/{id}.json"));
     let cached = path
         .as_ref()
         .and_then(|p| fs::read(p).ok())
@@ -74,18 +97,15 @@ fn validated_item(client: &reqwest::blocking::Client, item: &Value) -> Option<Va
         cached
     } else {
         let fetched = client.get("https://store.steampowered.com/api/appdetails/")
-            .query(&[("appids", id.to_string()), ("cc", "nl".to_string()), ("l", "english".to_string())])
+            .query(&[("appids", id.to_string()), ("cc", REGION.to_string()), ("l", "english".to_string())])
             .send().ok().and_then(|r| r.error_for_status().ok()).and_then(|r| r.json::<Value>().ok())
             .and_then(|v| {
                 let data = v.get(id.to_string())?.get("data")?;
                 Some(serde_json::json!({"type": data.get("type")?, "platforms": data.get("platforms"), "controller_support": data.get("controller_support"), "genres": data.get("genres"), "release_date": data.get("release_date")}))
             });
         if let (Some(facts), Some(path)) = (&fetched, &path) {
-            if let Some(parent) = path.parent() {
-                let _ = fs::create_dir_all(parent);
-            }
             if let Ok(bytes) = serde_json::to_vec(facts) {
-                let _ = fs::write(path, bytes);
+                crate::utils::write_cache_file(path, &bytes);
             }
         }
         fetched.or(cached)
@@ -331,7 +351,7 @@ fn linux_picks(client: &reqwest::blocking::Client) -> Vec<Value> {
                     .get("https://store.steampowered.com/api/appdetails/")
                     .query(&[
                         ("appids", id.to_string()),
-                        ("cc", "nl".into()),
+                        ("cc", REGION.into()),
                         ("l", "english".into()),
                     ])
                     .send()
@@ -372,7 +392,7 @@ pub fn featured() -> Apps {
         .ok()
         .and_then(|c| {
             c.get("https://store.steampowered.com/api/featuredcategories/")
-                .query(&[("cc", "nl"), ("l", "english")])
+                .query(&[("cc", REGION), ("l", "english")])
                 .send()
                 .ok()
         })
@@ -397,11 +417,8 @@ pub fn featured() -> Apps {
         })
         .filter(|v| !parse_featured(v).is_empty());
     if let (Some(value), Some(path)) = (&value, cache_path()) {
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
         if let Ok(bytes) = serde_json::to_vec(value) {
-            let _ = fs::write(path, bytes);
+            crate::utils::write_cache_file(&path, &bytes);
         }
     }
     value
@@ -424,7 +441,7 @@ pub fn search(term: &str) -> Result<Vec<SearchResult>, Box<dyn Error>> {
     }
     let value = client()?
         .get("https://store.steampowered.com/api/storesearch/")
-        .query(&[("term", term), ("cc", "nl"), ("l", "english")])
+        .query(&[("term", term), ("cc", REGION), ("l", "english")])
         .send()?
         .error_for_status()?
         .json::<Value>()?;
@@ -443,7 +460,7 @@ pub fn search(term: &str) -> Result<Vec<SearchResult>, Box<dyn Error>> {
 }
 
 pub fn image_path(info: &AppInfo) -> Option<PathBuf> {
-    Some(dirs::cache_dir()?.join(format!("cosmic-store/steam-images/{}.jpg", steam_id(info)?)))
+    cache_file(&format!("steam-images/{}.jpg", steam_id(info)?))
 }
 
 // Runs outside the UI thread. Never fetch an image from a URL typed by the user.
@@ -479,11 +496,44 @@ pub fn cache_images(apps: &Apps) {
         if bytes.len() > 5 * 1024 * 1024 {
             return;
         }
-        if let Some(parent) = path.parent() {
-            let _ = fs::create_dir_all(parent);
+        // Never cache an error page or other non-image body as artwork.
+        if !(bytes.starts_with(&[0xFF, 0xD8, 0xFF]) || bytes.starts_with(b"\x89PNG")) {
+            return;
         }
-        let _ = fs::write(path, bytes);
+        crate::utils::write_cache_file(&path, &bytes);
     });
+}
+
+pub fn alternatives(input: &str) -> &'static [&'static str] {
+    match input.trim().to_lowercase().as_str() {
+        "photoshop" | "adobe photoshop" => &["GIMP", "Krita"],
+        "premiere" | "adobe premiere" => &["Kdenlive", "Shotcut"],
+        "microsoft office" | "office" => &["LibreOffice", "ONLYOFFICE"],
+        _ => &[],
+    }
+}
+
+/// Desktop launchers cover both system and Flatpak installations without running commands.
+pub fn steam_desktop_available() -> bool {
+    let mut data_dirs = vec![
+        PathBuf::from("/usr/share"),
+        PathBuf::from("/usr/local/share"),
+    ];
+    if let Some(home) = dirs::data_dir() {
+        data_dirs.push(home);
+    }
+    if let Some(home) = dirs::home_dir() {
+        data_dirs.push(home.join(".local/share/flatpak/exports/share"));
+    }
+    data_dirs.push(PathBuf::from("/var/lib/flatpak/exports/share"));
+    if let Some(paths) = std::env::var_os("XDG_DATA_DIRS") {
+        data_dirs.extend(std::env::split_paths(&paths));
+    }
+    data_dirs.iter().any(|dir| {
+        ["steam.desktop", "com.valvesoftware.Steam.desktop"]
+            .iter()
+            .any(|name| dir.join("applications").join(name).is_file())
+    })
 }
 
 #[cfg(test)]
@@ -552,15 +602,6 @@ mod tests {
     }
 }
 
-pub fn alternatives(input: &str) -> &'static [&'static str] {
-    match input.trim().to_lowercase().as_str() {
-        "photoshop" | "adobe photoshop" => &["GIMP", "Krita"],
-        "premiere" | "adobe premiere" => &["Kdenlive", "Shotcut"],
-        "microsoft office" | "office" => &["LibreOffice", "ONLYOFFICE"],
-        _ => &[],
-    }
-}
-
 #[cfg(test)]
 mod product_type_tests {
     use super::*;
@@ -573,29 +614,6 @@ mod product_type_tests {
         assert!(software_type("game"));
         assert!(software_type("software"));
     }
-}
-
-/// Desktop launchers cover both system and Flatpak installations without running commands.
-pub fn steam_desktop_available() -> bool {
-    let mut data_dirs = vec![
-        PathBuf::from("/usr/share"),
-        PathBuf::from("/usr/local/share"),
-    ];
-    if let Some(home) = dirs::data_dir() {
-        data_dirs.push(home);
-    }
-    if let Some(home) = dirs::home_dir() {
-        data_dirs.push(home.join(".local/share/flatpak/exports/share"));
-    }
-    data_dirs.push(PathBuf::from("/var/lib/flatpak/exports/share"));
-    if let Some(paths) = std::env::var_os("XDG_DATA_DIRS") {
-        data_dirs.extend(std::env::split_paths(&paths));
-    }
-    data_dirs.iter().any(|dir| {
-        ["steam.desktop", "com.valvesoftware.Steam.desktop"]
-            .iter()
-            .any(|name| dir.join("applications").join(name).is_file())
-    })
 }
 
 #[cfg(test)]

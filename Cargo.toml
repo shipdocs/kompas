@@ -110,6 +110,8 @@ members = ["flathub-stats"]
 # [patch.'https://github.com/jackpot51/spdx.git']
 # spdx = { path = "../../spdx" }
 
-# Preserve the locked renderer API while fixing stale image batches on resize.
+# Locked renderer fix for stale image batches on resize, and a runtime fix
+# that drops iced's bootstrap window (a stray "winit window" on Mutter).
 [patch.'https://github.com/pop-os/libcosmic.git']
 iced_wgpu = { path = "patches/iced_wgpu" }
+iced_winit = { path = "patches/iced_winit" }

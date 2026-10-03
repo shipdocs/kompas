@@ -14,3 +14,6 @@ pub const MAX_GRID_WIDTH: f32 = 1600.0;
 
 /// Maximum number of search results to display
 pub const MAX_RESULTS: usize = 100;
+
+/// Directory name under the XDG cache dir for everything Kompas caches.
+pub const CACHE_DIR: &str = "kompas";

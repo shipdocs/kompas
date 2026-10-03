@@ -159,6 +159,59 @@ enum TransactionFlag {
     AllowDowngrade = 1 << 6,
 }
 
+/// On-disk copy of the available package names. PackageKit needs several seconds to
+/// enumerate them, so the copy is reused until the apt metadata changes.
+#[derive(bitcode::Encode, bitcode::Decode)]
+struct AvailableNamesCache {
+    fingerprint: u64,
+    names: Vec<String>,
+}
+
+const APT_LISTS_DIR: &str = "/var/lib/apt/lists";
+
+/// Changes whenever `apt update` replaces repository metadata or sources change.
+fn apt_lists_fingerprint() -> Option<u64> {
+    let mut newest = 0_u64;
+    let mut count = 0_u64;
+    for entry in std::fs::read_dir(APT_LISTS_DIR).ok()? {
+        let modified = entry.ok()?.metadata().ok()?.modified().ok()?;
+        let secs = modified
+            .duration_since(std::time::UNIX_EPOCH)
+            .ok()?
+            .as_secs();
+        newest = newest.max(secs);
+        count += 1;
+    }
+    // Without any lists the fingerprint would not prove anything.
+    (count > 0).then_some(newest ^ (count << 40))
+}
+
+fn available_names_cache_path() -> Option<std::path::PathBuf> {
+    Some(
+        dirs::cache_dir()?
+            .join(crate::constants::CACHE_DIR)
+            .join("packagekit-available.bitcode"),
+    )
+}
+
+fn load_available_names(fingerprint: u64) -> Option<HashSet<String>> {
+    let bytes = std::fs::read(available_names_cache_path()?).ok()?;
+    let cache = bitcode::decode::<AvailableNamesCache>(&bytes).ok()?;
+    (cache.fingerprint == fingerprint && !cache.names.is_empty())
+        .then(|| cache.names.into_iter().collect())
+}
+
+fn save_available_names(fingerprint: u64, names: &HashSet<String>) {
+    let Some(path) = available_names_cache_path() else {
+        return;
+    };
+    let cache = AvailableNamesCache {
+        fingerprint,
+        names: names.iter().cloned().collect(),
+    };
+    crate::utils::write_cache_file(&path, &bitcode::encode(&cache));
+}
+
 #[derive(Debug)]
 enum PackageAvailability {
     Known(HashSet<String>),
@@ -235,8 +288,21 @@ impl Packagekit {
         // Lazy-load cache on first use
         let mut cache = self.available_packages_cache.lock().unwrap();
         if cache.is_none() {
+            let fingerprint = apt_lists_fingerprint();
+            if let Some(names) = fingerprint.and_then(load_available_names) {
+                log::info!("loaded {} available package names from disk", names.len());
+                *cache = Some(PackageAvailability::Known(names));
+            }
+        }
+        if cache.is_none() {
+            let fingerprint = apt_lists_fingerprint();
             match self.build_available_packages_cache() {
-                Ok(c) => *cache = Some(PackageAvailability::Known(c)),
+                Ok(c) => {
+                    if let Some(fingerprint) = fingerprint {
+                        save_available_names(fingerprint, &c);
+                    }
+                    *cache = Some(PackageAvailability::Known(c));
+                }
                 Err(e) => {
                     log::error!("Failed to build available packages cache: {}", e);
                     // Availability is unknown, not unavailable. Cache the failure so
@@ -618,5 +684,22 @@ mod update_tests {
     #[test]
     fn stale_update_selection_reports_no_pending_updates() {
         assert!(update_package_ids(&["kompas"], &[package("other;3;amd64;updates")]).is_err());
+    }
+}
+
+#[cfg(test)]
+mod availability_cache_tests {
+    use super::AvailableNamesCache;
+
+    #[test]
+    fn available_names_round_trip_through_bitcode() {
+        let cache = AvailableNamesCache {
+            fingerprint: 42,
+            names: vec!["gimp".into(), "kompas".into()],
+        };
+        let decoded = bitcode::decode::<AvailableNamesCache>(&bitcode::encode(&cache)).unwrap();
+        assert_eq!(decoded.fingerprint, 42);
+        assert_eq!(decoded.names, ["gimp", "kompas"]);
+        assert!(bitcode::decode::<AvailableNamesCache>(b"not a cache").is_err());
     }
 }

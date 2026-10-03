@@ -114,3 +114,35 @@ fn invalid_repository_header_is_rejected() {
             .is_err()
     );
 }
+
+#[test]
+fn repeated_header_key_keeps_the_components() {
+    // Zorin's extra catalog repeats a key in the header document.
+    let yaml_data = r#"
+---
+File: DEP11
+Version: '0.8'
+File: DEP11
+---
+Type: desktop-application
+ID: org.example.App1
+Name:
+  C: App One
+Summary:
+  C: The first app
+"#;
+    let (origin, infos, _) = AppstreamCache::default()
+        .parse_yaml("test.yml", yaml_data.as_bytes())
+        .expect("a repeated header key must not discard the catalog");
+    assert_eq!(origin, None);
+    assert_eq!(infos.len(), 1);
+}
+
+#[test]
+fn non_catalog_yaml_is_still_rejected() {
+    assert!(
+        AppstreamCache::default()
+            .parse_yaml("test.yml", b"- [unterminated")
+            .is_err()
+    );
+}

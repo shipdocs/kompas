@@ -107,6 +107,14 @@ pub struct AppstreamCache {
     pub addons: HashMap<AppId, Vec<AppId>>,
 }
 
+/// A repeated header key that does not identify the repository or its media.
+fn is_harmless_duplicate_header_key(error: &serde_yaml::Error) -> bool {
+    let message = error.to_string();
+    message.contains("duplicate entry")
+        && !message.contains("\"Origin\"")
+        && !message.contains("\"MediaBaseUrl\"")
+}
+
 impl AppstreamCache {
     /// Get cache for specified appstream data sources
     pub fn new(
@@ -240,7 +248,7 @@ impl AppstreamCache {
 
     /// Directory where cache should be stored
     fn cache_dir(&self, cache_name: &str) -> Option<PathBuf> {
-        dirs::cache_dir().map(|x| x.join("cosmic-store").join(cache_name))
+        dirs::cache_dir().map(|x| x.join(crate::constants::CACHE_DIR).join(cache_name))
     }
 
     /// Cache version includes original product release-date metadata.
@@ -643,7 +651,7 @@ impl AppstreamCache {
                     match self.parse_xml(path, &buffer) {
                         Ok(ok) => Some(ok),
                         Err(err) => {
-                            log::error!("failed to parse {:?}: {}", path, err);
+                            log::warn!("skipping unreadable AppStream file {:?}: {}", path, err);
                             None
                         }
                     }
@@ -651,7 +659,7 @@ impl AppstreamCache {
                     match self.parse_yaml(path, &buffer) {
                         Ok(ok) => Some(ok),
                         Err(err) => {
-                            log::error!("failed to parse {:?}: {}", path, err);
+                            log::warn!("skipping unreadable AppStream file {:?}: {}", path, err);
                             None
                         }
                     }
@@ -770,8 +778,9 @@ impl AppstreamCache {
                                 ));
                             }
                             Err(err) => {
-                                log::error!(
-                                    "failed to parse {:?} in {:?}: {}",
+                                // Unsupported component types (for example web apps) are expected.
+                                log::debug!(
+                                    "skipping component {:?} in {:?}: {}",
                                     e.get_child("id")
                                         .and_then(|x| appstream::AppId::try_from(x).ok()),
                                     path,
@@ -813,7 +822,19 @@ impl AppstreamCache {
         for (index, document) in serde_yaml::Deserializer::from_str(yaml_str).enumerate() {
             match serde_yaml::Value::deserialize(document) {
                 Ok(value) => documents.push(value),
-                // The header defines repository identity and must remain valid.
+                // The header defines repository identity. Some distribution catalogs
+                // (for example Zorin's extra repository) repeat a key in it, which
+                // YAML parsing rejects; keep the components and lose only the origin.
+                // A repeated Origin or MediaBaseUrl stays an error: it is ambiguous.
+                Err(error) if index == 0 && is_harmless_duplicate_header_key(&error) => {
+                    log::warn!(
+                        "ignoring malformed AppStream header in {:?}: {}",
+                        path,
+                        error
+                    );
+                    documents.push(serde_yaml::Value::Null);
+                }
+                // Any other header error means this is not an AppStream catalog.
                 Err(error) if index == 0 => return Err(Box::new(error)),
                 Err(error) => log::warn!(
                     "skipping malformed AppStream document {} in {:?}: {}",
@@ -1254,7 +1275,7 @@ impl AppstreamCache {
                                         }
                                     },
                                     None => {
-                                        log::warn!(
+                                        log::debug!(
                                             "unsupported url kind {:?} for {:?} in {:?}",
                                             url_value,
                                             component.id,
@@ -1275,7 +1296,7 @@ impl AppstreamCache {
                                     Some("translate") => ProjectUrl::Translate(url),
                                     //TODO: add to appstream crate: Some("vcs-browser") => ProjectUrl::VcsBrowser(url),
                                     _ => {
-                                        log::warn!(
+                                        log::debug!(
                                             "unsupported url kind {:?} for {:?} in {:?}",
                                             key,
                                             component.id,
@@ -1332,7 +1353,7 @@ impl AppstreamCache {
                         ))
                     }
                     Err(err) => {
-                        log::error!("failed to parse {:?} in {:?}: {}", value["ID"], path, err);
+                        log::debug!("skipping component {:?} in {:?}: {}", value["ID"], path, err);
                         None
                     }
                 }

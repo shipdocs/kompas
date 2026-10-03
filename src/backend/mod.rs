@@ -112,7 +112,11 @@ pub fn backends(locale: &str, refresh: bool) -> Backends {
 
     backends.par_iter_mut().for_each(|(backend_name, backend)| {
         let start = Instant::now();
-        match Arc::get_mut(backend).unwrap().load_caches(refresh) {
+        let Some(backend_mut) = Arc::get_mut(backend) else {
+            log::error!("backend {} is shared, cannot load its caches", backend_name);
+            return;
+        };
+        match backend_mut.load_caches(refresh) {
             Ok(()) => {
                 let duration = start.elapsed();
                 log::info!("loaded {} backend caches in {:?}", backend_name, duration);

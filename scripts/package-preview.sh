@@ -22,6 +22,8 @@ done < <(find res/icons/hicolor -type f -name '*.svg')
 install -Dm0644 LICENSE "$staging/usr/share/doc/kompas/copyright"
 install -Dm0644 patches/iced_wgpu/LICENSE "$staging/usr/share/doc/kompas/iced-wgpu-license"
 install -Dm0644 patches/iced_wgpu/KOMPAS-PATCH.md "$staging/usr/share/doc/kompas/renderer-patch.md"
+install -Dm0644 patches/iced_winit/LICENSE "$staging/usr/share/doc/kompas/iced-winit-license"
+install -Dm0644 patches/iced_winit/KOMPAS-PATCH.md "$staging/usr/share/doc/kompas/runtime-patch.md"
 # Ship a package-linked catalog so Software can match the app name, icon and license.
 python3 scripts/package-metadata.py "$staging/usr/share" "$version"
 mkdir -p "$staging/DEBIAN"

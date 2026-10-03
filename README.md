@@ -6,11 +6,11 @@ Kompas is independently maintained by ShipDocs and built on [COSMIC Store](https
 
 The program and package are named `kompas`. A `cosmic-store` command alias is retained for existing scripts. The app ID is `app.shipdocs.Kompas`; old preferences and file associations are preserved. This is a ShipDocs project, not an official Zorin store.
 
-[Project website](https://shipdocs.github.io/kompas/) · [Preview release](https://github.com/shipdocs/kompas/releases/tag/v0.1.0-preview.2)
+[Project website](https://shipdocs.github.io/kompas/) · [Releases](https://github.com/shipdocs/kompas/releases)
 
 ## Install the Zorin test build
 
-Download the `.deb` and checksums from the [preview release](https://github.com/shipdocs/kompas/releases/tag/v0.1.0-preview.2).
+Download the `.deb` and checksums from the newest [preview release](https://github.com/shipdocs/kompas/releases).
 For the newest development package, download **kompas-zorin-preview-amd64** from the latest successful
 [development build](https://github.com/shipdocs/kompas/actions/workflows/lint.yml),
 extract the ZIP and install the `.deb` on Zorin 18 / Ubuntu 24.04 (64-bit Intel/AMD):
@@ -51,7 +51,45 @@ system and the page after installation; those are distinct checks.
 - **Unified discovery**: System/Zorin packages, Flatpak and Steam with source selection, Linux-native filtering and consistent sorting.
 - **Complete browsing**: Progressive “Show more” browsing through the loaded catalog, result counts and recoverable empty states.
 - **Game launchers**: Discover Steam and Heroic (Epic/GOG); Steam game pages help install the client before handing over installation.
-- **Performance**: Async parsing of AppStream data and optimized icon loading.
+- **Performance**: AppStream data is parsed in the background and icons are cached. Preview packages are unoptimized stripped debug builds, so startup and search are slower than a release build will be.
+
+## How discovery works
+
+The start page shows Steam games with current native Linux metadata, followed by new releases and general games. A small curated set provides discovery entry points; names, prices, artwork and Linux flags are fetched from Steam, and games without an explicit current Linux flag are excluded from the native section.
+Steam artwork, storefront pricing, controller metadata and Linux platform flags come
+from Steam's public store endpoints. These endpoints are not a guaranteed stable API.
+The Netherlands region is used for displayed prices. Cached featured metadata remains
+available if Steam cannot be reached. Local applications remain usable without Steam.
+
+Search first displays results from configured Flatpak and system sources, then adds
+Steam matches after a short typing debounce. Plain text queries of at least two
+characters are sent to Steam when the Wayland filter is set to All. URI/file/codec
+searches remain local. Search GTA expands to Grand Theft Auto; Photoshop, Premiere
+and Microsoft Office searches also suggest available native alternatives.
+
+System software is resolved through PackageKit against enabled repositories, including
+Zorin's own repositories. Metadata origins no longer need to contain an Ubuntu codename.
+The store does not add repositories or expand package permissions automatically.
+
+Steam games have separate actions to open the installation dialog in Steam, view/buy
+in the web store, and check ProtonDB. Installation requires a working Steam URI handler
+and any required game license. Steam artwork is cached locally; an empty cache displays
+a game icon until images arrive. This does not claim that every Windows game or online
+mode works on Linux. No Epic/GOG login, purchase or account linking is performed.
+
+### Unified browsing and compatibility
+
+“All apps” lists applications from the configured system/Flatpak catalogs and the fetched Steam featured selection. Live search extends Steam discovery; this is not an exhaustive local index of Steam. The source selector applies to search, category lists and home sections, and can choose a Flatpak alternative when the preferred source is a system package. All result sources share sorting, including Name (A–Z). Popularity and update sorts place items with missing metadata after items with known values; Steam sales are not converted to Flatpak download counts.
+
+Native Linux only is enabled by default. It hides Steam titles unless Steam explicitly reports a native Linux version. Disable it to include titles requiring a Proton compatibility check. PackageKit availability is checked against the configured system; Flatpak catalogs are selected by libflatpak for the host architecture. Native support does not establish that a particular GPU, driver, RAM configuration, anti-cheat setup or desktop session meets an app's requirements. Hardware/Proton compatibility inference remains future work. This conservative default intentionally hides many Windows games that can run well with Proton.
+
+The user-facing product name is **Kompas**, a working name rather than a cleared trademark. The executable and Debian package are `kompas`. The app ID is `app.shipdocs.Kompas`, so Kompas does not share COSMIC Store reviews. Legacy preferences are loaded on first use and a hidden desktop alias preserves existing file associations; the old command is a compatibility alias. Window controls use Adwaita symbolic icons, which are a package dependency.
+
+Malformed YAML components are skipped individually so one duplicate translation key cannot discard an entire system repository. A repository header with a repeated key (seen in Zorin's extra catalog) is tolerated, and that catalog's origin is then unknown; any other invalid header skips the file with a warning. Existing AppStream caches are rebuilt once for this parser revision.
+
+Kompas stores its caches in `~/.cache/kompas`. Earlier previews used `~/.cache/cosmic-store`; that directory is no longer read and can be deleted.
+
+Steam discovery validates product types through cached app-details metadata before publishing items. Hardware and video products are excluded even when storefront search calls them apps. Product facts are cached for a day, with previously validated metadata as an offline fallback. First-time remote results may arrive later because this requires additional background requests; local results remain available immediately.
 
 ## Branch Structure
 
@@ -131,7 +169,7 @@ Pull requests into `develop` and pushes to `develop` run these checks on Ubuntu 
 
 - Release-date sorting depends on publisher metadata. Unknown dates go last; first-added dates for Flatpak/system apps are not available yet.
 - Download counts indicate popularity within their source, not quality or comparable sales across stores. A user review system is planned, not implemented; Kompas does not inherit COSMIC Store ratings.
-- Steam discovery and search are integrated. Epic and GOG catalogs remain future work.
+- Steam discovery and search are integrated and only available on x86_64. Epic and GOG catalogs remain future work.
 - Steam controls purchase and installation; ownership is not checked by this store.
 - ProtonDB opens as an external compatibility reference; compatibility ratings are not fetched or asserted.
 - Wayland badges are estimates; they do not certify GPU, controller, or runtime compatibility.
@@ -148,39 +186,3 @@ The preview `.deb` can be installed on an existing Zorin system. Inclusion in th
 standard Zorin installation requires a stable release, maintained distribution and
 agreement with the Zorin team. A signed APT repository would provide automatic
 updates; it has not been published yet.
-
-## Unified discovery
-
-The start page shows Steam games with current native Linux metadata, followed by new releases and general games. A small curated set provides discovery entry points; names, prices, artwork and Linux flags are fetched from Steam, and games without an explicit current Linux flag are excluded from the native section.
-Steam artwork, storefront pricing, controller metadata and Linux platform flags come
-from Steam's public store endpoints. These endpoints are not a guaranteed stable API.
-The Netherlands region is used for displayed prices. Cached featured metadata remains
-available if Steam cannot be reached. Local applications remain usable without Steam.
-
-Search first displays results from configured Flatpak and system sources, then adds
-Steam matches after a short typing debounce. Plain text queries of at least two
-characters are sent to Steam when the Wayland filter is set to All. URI/file/codec
-searches remain local. Search GTA expands to Grand Theft Auto; Photoshop, Premiere
-and Microsoft Office searches also suggest available native alternatives.
-
-System software is resolved through PackageKit against enabled repositories, including
-Zorin's own repositories. Metadata origins no longer need to contain an Ubuntu codename.
-The store does not add repositories or expand package permissions automatically.
-
-Steam games have separate actions to open the installation dialog in Steam, view/buy
-in the web store, and check ProtonDB. Installation requires a working Steam URI handler
-and any required game license. Steam artwork is cached locally; an empty cache displays
-a game icon until images arrive. This does not claim that every Windows game or online
-mode works on Linux. No Epic/GOG login, purchase or account linking is performed.
-
-### Unified browsing and compatibility
-
-“All apps” lists applications from the configured system/Flatpak catalogs and the fetched Steam featured selection. Live search extends Steam discovery; this is not an exhaustive local index of Steam. The source selector applies to search, category lists and home sections, and can choose a Flatpak alternative when the preferred source is a system package. All result sources share sorting, including Name (A–Z). Popularity and update sorts place items with missing metadata after items with known values; Steam sales are not converted to Flatpak download counts.
-
-Native Linux only is enabled by default. It hides Steam titles unless Steam explicitly reports a native Linux version. Disable it to include titles requiring a Proton compatibility check. PackageKit availability is checked against the configured system; Flatpak catalogs are selected by libflatpak for the host architecture. Native support does not establish that a particular GPU, driver, RAM configuration, anti-cheat setup or desktop session meets an app's requirements. Hardware/Proton compatibility inference remains future work. This conservative default intentionally hides many Windows games that can run well with Proton.
-
-The user-facing product name is **Kompas**, a working name rather than a cleared trademark. The executable and Debian package are `kompas`. The app ID is `app.shipdocs.Kompas`, so Kompas does not share COSMIC Store reviews. Legacy preferences are loaded on first use and a hidden desktop alias preserves existing file associations; the old command is a compatibility alias. Window controls use Adwaita symbolic icons, which are a package dependency.
-
-Malformed YAML components are skipped individually so one duplicate translation key cannot discard an entire system repository; invalid repository headers still fail. Existing AppStream caches are rebuilt once for this parser revision.
-
-Steam discovery validates product types through cached app-details metadata before publishing items. Hardware and video products are excluded even when storefront search calls them apps. Product facts are cached for a day, with previously validated metadata as an offline fallback. First-time remote results may arrive later because this requires additional background requests; local results remain available immediately.
