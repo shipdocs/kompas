@@ -60,10 +60,10 @@ pub fn generic_search<
                 if let Some(weight) =
                     filter_map(id, info, *installed, stats_downloads, stats_compat)
                 {
-                    if let Some(prev_weight) = best_weight {
-                        if prev_weight <= weight {
-                            continue;
-                        }
+                    if let Some(prev_weight) = best_weight
+                        && prev_weight <= weight
+                    {
+                        continue;
                     }
 
                     best_weight = Some(weight);
@@ -650,12 +650,12 @@ fn calculate_explore_weight(
             }
             let mut min_weight = 0;
             for release in info.releases.iter() {
-                if let Some(timestamp) = release.timestamp {
-                    if timestamp < now {
-                        let weight = -timestamp;
-                        if weight < min_weight {
-                            min_weight = weight;
-                        }
+                if let Some(timestamp) = release.timestamp
+                    && timestamp < now
+                {
+                    let weight = -timestamp;
+                    if weight < min_weight {
+                        min_weight = weight;
                     }
                 }
             }

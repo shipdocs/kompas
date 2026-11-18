@@ -583,27 +583,27 @@ pub fn handle_selection_message(app: &mut App, message: Message) -> Task<Message
 
         Message::SelectedSource(i) => {
             let mut next_ids = None;
-            if let Some(selected) = &app.details_page_opt {
-                if let Some(source) = selected.sources.get(i) {
-                    next_ids = Some((
-                        source.backend_name,
-                        source.source_id.clone(),
-                        selected.id.clone(),
-                    ));
-                }
+            if let Some(selected) = &app.details_page_opt
+                && let Some(source) = selected.sources.get(i)
+            {
+                next_ids = Some((
+                    source.backend_name,
+                    source.source_id.clone(),
+                    selected.id.clone(),
+                ));
             }
             if let Some((backend_name, source_id, id)) = next_ids {
                 if let Some(backend) = app.backends.get(backend_name) {
                     for appstream_cache in backend.info_caches() {
-                        if appstream_cache.source_id == source_id {
-                            if let Some(info) = appstream_cache.infos.get(&id) {
-                                return app.select(
-                                    backend_name,
-                                    id,
-                                    Some(appstream_cache.icon(info)),
-                                    info.clone(),
-                                );
-                            }
+                        if appstream_cache.source_id == source_id
+                            && let Some(info) = appstream_cache.infos.get(&id)
+                        {
+                            return app.select(
+                                backend_name,
+                                id,
+                                Some(appstream_cache.icon(info)),
+                                info.clone(),
+                            );
                         }
                     }
                 }
@@ -856,15 +856,14 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
                 && !modifiers.control()
                 && !modifiers.alt()
                 && matches!(key, Key::Character(_))
+                && let Some(text) = text
             {
-                if let Some(text) = text {
-                    app.search_active = true;
-                    app.search_input.push_str(&text);
-                    return Task::batch([
-                        widget::text_input::focus(app.search_id.clone()),
-                        app.search(),
-                    ]);
-                }
+                app.search_active = true;
+                app.search_input.push_str(&text);
+                return Task::batch([
+                    widget::text_input::focus(app.search_id.clone()),
+                    app.search(),
+                ]);
             }
         }
         Message::LaunchUrl(url) => match open::that_detached(&url) {
@@ -962,20 +961,19 @@ pub fn update(app: &mut App, message: Message) -> Task<Message> {
             // check if the applet is already added to the panel
             let applet_id = id.raw().to_owned();
             let mut applet_exists = false;
-            if let Some(center) = applet_config.plugins_center.as_ref() {
-                if center.iter().any(|a: &String| a.as_str() == applet_id) {
-                    applet_exists = true;
-                }
+            if let Some(center) = applet_config.plugins_center.as_ref()
+                && center.iter().any(|a: &String| a.as_str() == applet_id)
+            {
+                applet_exists = true;
             }
-            if let Some(wings) = applet_config.plugins_wings.as_ref() {
-                if wings
+            if let Some(wings) = applet_config.plugins_wings.as_ref()
+                && wings
                     .0
                     .iter()
                     .chain(wings.1.iter())
                     .any(|a: &String| a.as_str() == applet_id)
-                {
-                    applet_exists = true;
-                }
+            {
+                applet_exists = true;
             }
 
             // if applet doesn't already exist, continue adding

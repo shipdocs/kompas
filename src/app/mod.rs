@@ -277,20 +277,19 @@ impl App {
         if self.subcategory > 0 {
             return self.update(Message::Subcategory(0));
         }
-        if let Some((page, subcategory)) = self.nav_history.pop() {
-            if let Some(id) = self
+        if let Some((page, subcategory)) = self.nav_history.pop()
+            && let Some(id) = self
                 .nav_ids
                 .iter()
                 .find(|(p, _)| *p == page)
                 .map(|(_, id)| *id)
-            {
-                let task = self.on_nav_select(id);
-                self.nav_history.pop(); // Back must not add a forward entry.
-                if subcategory > 0 {
-                    return Task::batch(vec![task, self.update(Message::Subcategory(subcategory))]);
-                }
-                return task;
+        {
+            let task = self.on_nav_select(id);
+            self.nav_history.pop(); // Back must not add a forward entry.
+            if subcategory > 0 {
+                return Task::batch(vec![task, self.update(Message::Subcategory(subcategory))]);
             }
+            return task;
         }
         Task::none()
     }
@@ -435,57 +434,57 @@ impl App {
         selected_info: &Arc<AppInfo>,
         addon: bool,
     ) -> Vec<Element<'_, Message>> {
-        if selected_backend_name == crate::catalog::STEAM {
-            if let Some(id) = crate::catalog::steam_id(selected_info) {
-                let installed = self.installed.as_ref().is_some_and(|packages| {
-                    packages.iter().any(|(_, package)| {
-                        package
-                            .info
-                            .pkgnames
-                            .iter()
-                            .any(|name| name == "steam" || name == "steam-installer")
-                            || package.info.desktop_ids.iter().any(|name| {
-                                matches!(
-                                    name.as_str(),
-                                    "steam.desktop" | "com.valvesoftware.Steam.desktop"
-                                )
-                            })
-                            || package.id.normalized() == "com.valvesoftware.Steam"
+        if selected_backend_name == crate::catalog::STEAM
+            && let Some(id) = crate::catalog::steam_id(selected_info)
+        {
+            let installed = self.installed.as_ref().is_some_and(|packages| {
+                packages.iter().any(|(_, package)| {
+                    package
+                        .info
+                        .pkgnames
+                        .iter()
+                        .any(|name| name == "steam" || name == "steam-installer")
+                        || package.info.desktop_ids.iter().any(|name| {
+                            matches!(
+                                name.as_str(),
+                                "steam.desktop" | "com.valvesoftware.Steam.desktop"
+                            )
+                        })
+                        || package.id.normalized() == "com.valvesoftware.Steam"
+                })
+            }) || crate::catalog::steam_desktop_available();
+            let action = if installed {
+                Message::LaunchUrl(crate::catalog::install_url(id))
+            } else {
+                Message::FindApp("Steam".into())
+            };
+            return vec![
+                widget::column::with_children(vec![
+                    widget::text::caption(if installed {
+                        fl!("steam-ready")
+                    } else {
+                        fl!("steam-required")
                     })
-                }) || crate::catalog::steam_desktop_available();
-                let action = if installed {
-                    Message::LaunchUrl(crate::catalog::install_url(id))
-                } else {
-                    Message::FindApp("Steam".into())
-                };
-                return vec![
-                    widget::column::with_children(vec![
-                        widget::text::caption(if installed {
-                            fl!("steam-ready")
-                        } else {
-                            fl!("steam-required")
-                        })
-                        .into(),
-                        widget::button::suggested(if installed {
-                            fl!("steam-install")
-                        } else {
-                            fl!("steam-get-client")
-                        })
-                        .on_press(action)
-                        .into(),
-                        widget::button::standard(fl!("steam-store"))
-                            .on_press(Message::LaunchUrl(crate::catalog::store_url(id)))
-                            .into(),
-                        widget::button::standard(fl!("steam-compatibility"))
-                            .on_press(Message::LaunchUrl(format!(
-                                "https://www.protondb.com/app/{id}"
-                            )))
-                            .into(),
-                    ])
-                    .spacing(8)
                     .into(),
-                ];
-            }
+                    widget::button::suggested(if installed {
+                        fl!("steam-install")
+                    } else {
+                        fl!("steam-get-client")
+                    })
+                    .on_press(action)
+                    .into(),
+                    widget::button::standard(fl!("steam-store"))
+                        .on_press(Message::LaunchUrl(crate::catalog::store_url(id)))
+                        .into(),
+                    widget::button::standard(fl!("steam-compatibility"))
+                        .on_press(Message::LaunchUrl(format!(
+                            "https://www.protondb.com/app/{id}"
+                        )))
+                        .into(),
+                ])
+                .spacing(8)
+                .into(),
+            ];
         }
         //TODO: more efficient checks
         let mut waiting_refresh = false;
@@ -647,12 +646,12 @@ impl App {
         let mut addons = Vec::new();
         if let Some(backend) = self.backends.get(backend_name) {
             for appstream_cache in backend.info_caches() {
-                if appstream_cache.source_id == info.source_id {
-                    if let Some(ids) = appstream_cache.addons.get(id) {
-                        for id in ids {
-                            if let Some(info) = appstream_cache.infos.get(id) {
-                                addons.push((id.clone(), info.clone()));
-                            }
+                if appstream_cache.source_id == info.source_id
+                    && let Some(ids) = appstream_cache.addons.get(id)
+                {
+                    for id in ids {
+                        if let Some(info) = appstream_cache.infos.get(id) {
+                            addons.push((id.clone(), info.clone()));
                         }
                     }
                 }
@@ -879,10 +878,10 @@ impl App {
             let sources_opt = self.details_page_opt.as_ref().map(|selected| {
                 self.selected_sources(selected.backend_name, &selected.id, &selected.info)
             });
-            if let Some(sources) = sources_opt {
-                if let Some(selected) = &mut self.details_page_opt {
-                    selected.sources = sources;
-                }
+            if let Some(sources) = sources_opt
+                && let Some(selected) = &mut self.details_page_opt
+            {
+                selected.sources = sources;
             }
         }
 
@@ -1230,17 +1229,17 @@ impl App {
             for other in sources.iter() {
                 if source.backend_name == other.backend_name {
                     // Add other sources required by this source
-                    if source.requires.contains(&other.id) {
-                        if let Some(add) = other.add() {
-                            adds.push(add);
-                        }
+                    if source.requires.contains(&other.id)
+                        && let Some(add) = other.add()
+                    {
+                        adds.push(add);
                     }
 
                     // Remove other sources that require this source
-                    if other.requires.contains(&source.id) {
-                        if let Some(rm) = other.remove() {
-                            rms.push(rm);
-                        }
+                    if other.requires.contains(&source.id)
+                        && let Some(rm) = other.remove()
+                    {
+                        rms.push(rm);
                     }
                 }
             }

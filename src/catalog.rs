@@ -103,10 +103,10 @@ fn validated_item(client: &reqwest::blocking::Client, item: &Value) -> Option<Va
                 let data = v.get(id.to_string())?.get("data")?;
                 Some(serde_json::json!({"type": data.get("type")?, "platforms": data.get("platforms"), "controller_support": data.get("controller_support"), "genres": data.get("genres"), "release_date": data.get("release_date")}))
             });
-        if let (Some(facts), Some(path)) = (&fetched, &path) {
-            if let Ok(bytes) = serde_json::to_vec(facts) {
-                crate::utils::write_cache_file(path, &bytes);
-            }
+        if let (Some(facts), Some(path)) = (&fetched, &path)
+            && let Ok(bytes) = serde_json::to_vec(facts)
+        {
+            crate::utils::write_cache_file(path, &bytes);
         }
         fetched.or(cached)
     }?;
@@ -151,10 +151,10 @@ fn validate_featured(mut value: Value) -> Value {
             .and_then(Value::as_array)
         {
             for item in feed.iter().take(16) {
-                if let Some(id) = item.get("id").and_then(Value::as_u64) {
-                    if ids.insert(id) {
-                        items.push(item.clone());
-                    }
+                if let Some(id) = item.get("id").and_then(Value::as_u64)
+                    && ids.insert(id)
+                {
+                    items.push(item.clone());
                 }
             }
         }
@@ -245,13 +245,13 @@ fn item_info(item: &Value, new_release: bool) -> Option<(AppId, Arc<AppInfo>)> {
         crate::fl!("steam-handoff-description"),
         compatibility
     );
-    if let Some(controller) = item.get("controller_support").and_then(Value::as_str) {
-        if controller == "full" || controller == "partial" {
-            description.push_str(&format!(
-                "\n{}: {controller}",
-                crate::fl!("steam-controller")
-            ));
-        }
+    if let Some(controller) = item.get("controller_support").and_then(Value::as_str)
+        && (controller == "full" || controller == "partial")
+    {
+        description.push_str(&format!(
+            "\n{}: {controller}",
+            crate::fl!("steam-controller")
+        ));
     }
     let image = item
         .get("header_image")
@@ -416,10 +416,10 @@ pub fn featured() -> Apps {
             value
         })
         .filter(|v| !parse_featured(v).is_empty());
-    if let (Some(value), Some(path)) = (&value, cache_path()) {
-        if let Ok(bytes) = serde_json::to_vec(value) {
-            crate::utils::write_cache_file(&path, &bytes);
-        }
+    if let (Some(value), Some(path)) = (&value, cache_path())
+        && let Ok(bytes) = serde_json::to_vec(value)
+    {
+        crate::utils::write_cache_file(&path, &bytes);
     }
     value
         .or(cached)

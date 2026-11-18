@@ -141,27 +141,22 @@ fn try_load_bundled_v7() -> Option<Vec<u8>> {
 
 fn is_cache_stale() -> bool {
     // Check v0-8 cache first
-    if let Some(cache_path) = get_cache_path_v8() {
-        if let Ok(metadata) = std::fs::metadata(&cache_path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(elapsed) = modified.elapsed() {
-                    if elapsed.as_secs() < CACHE_MAX_AGE_SECS {
-                        return false; // v8 cache is fresh
-                    }
-                }
-            }
-        }
+    if let Some(cache_path) = get_cache_path_v8()
+        && let Ok(metadata) = std::fs::metadata(&cache_path)
+        && let Ok(modified) = metadata.modified()
+        && let Ok(elapsed) = modified.elapsed()
+        && elapsed.as_secs() < CACHE_MAX_AGE_SECS
+    {
+        return false; // v8 cache is fresh
     }
 
     // Fall back to checking v0-7 cache
-    if let Some(cache_path) = get_cache_path_v7() {
-        if let Ok(metadata) = std::fs::metadata(&cache_path) {
-            if let Ok(modified) = metadata.modified() {
-                if let Ok(elapsed) = modified.elapsed() {
-                    return elapsed.as_secs() >= CACHE_MAX_AGE_SECS;
-                }
-            }
-        }
+    if let Some(cache_path) = get_cache_path_v7()
+        && let Ok(metadata) = std::fs::metadata(&cache_path)
+        && let Ok(modified) = metadata.modified()
+        && let Ok(elapsed) = modified.elapsed()
+    {
+        return elapsed.as_secs() >= CACHE_MAX_AGE_SECS;
     }
 
     true // No cache found or couldn't check
@@ -222,11 +217,11 @@ fn download_and_cache() -> Option<Vec<u8>> {
         }
 
         // Write metadata if available
-        if let Some(meta_json) = metadata_content {
-            if let Some(cache_path) = cache_file(METADATA_CACHE_PATH) {
-                crate::utils::write_cache_file(&cache_path, meta_json.as_bytes());
-                log::info!("cached metadata");
-            }
+        if let Some(meta_json) = metadata_content
+            && let Some(cache_path) = cache_file(METADATA_CACHE_PATH)
+        {
+            crate::utils::write_cache_file(&cache_path, meta_json.as_bytes());
+            log::info!("cached metadata");
         }
     } else if version == 7 {
         // Write v0-7 bitcode
@@ -263,38 +258,38 @@ fn load_stats() -> &'static FlathubStats {
         #[cfg(feature = "flathub-stats-v8")]
         {
             // 1. Try v0-8 cache first
-            if let Some(data) = try_load_cached_v8() {
-                if let Some(stats) = decode_v8(&data) {
-                    log::info!("loaded v0-8 stats from cache in {:?}", start.elapsed());
-                    return stats;
-                }
+            if let Some(data) = try_load_cached_v8()
+                && let Some(stats) = decode_v8(&data)
+            {
+                log::info!("loaded v0-8 stats from cache in {:?}", start.elapsed());
+                return stats;
             }
 
             // 2. Try bundled v0-8
-            if let Some(data) = try_load_bundled_v8() {
-                if let Some(stats) = decode_v8(&data) {
-                    log::info!("loaded bundled v0-8 stats in {:?}", start.elapsed());
-                    return stats;
-                }
+            if let Some(data) = try_load_bundled_v8()
+                && let Some(stats) = decode_v8(&data)
+            {
+                log::info!("loaded bundled v0-8 stats in {:?}", start.elapsed());
+                return stats;
             }
         }
 
         // 3. Try v0-7 cache
         #[cfg(feature = "flathub-stats-v7")]
         {
-            if let Some(data) = try_load_cached_v7() {
-                if let Some(stats) = decode_v7(&data) {
-                    log::info!("loaded v0-7 stats from cache in {:?}", start.elapsed());
-                    return stats;
-                }
+            if let Some(data) = try_load_cached_v7()
+                && let Some(stats) = decode_v7(&data)
+            {
+                log::info!("loaded v0-7 stats from cache in {:?}", start.elapsed());
+                return stats;
             }
 
             // 4. Try bundled v0-7
-            if let Some(data) = try_load_bundled_v7() {
-                if let Some(stats) = decode_v7(&data) {
-                    log::info!("loaded bundled v0-7 stats in {:?}", start.elapsed());
-                    return stats;
-                }
+            if let Some(data) = try_load_bundled_v7()
+                && let Some(stats) = decode_v7(&data)
+            {
+                log::info!("loaded bundled v0-7 stats in {:?}", start.elapsed());
+                return stats;
             }
         }
 
