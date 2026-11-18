@@ -312,19 +312,25 @@ pub fn handle_backend_message(app: &mut App, message: Message) -> Task<Message> 
         }
         Message::CheckUpdates => app.update_updates(),
         Message::UpdateAll => {
+            // One operation per backend: each operation is one transaction, so the
+            // user authenticates once per backend instead of once per package.
             let ops: Vec<_> = app
                 .updates
                 .as_ref()
                 .map(|updates| {
-                    updates
-                        .iter()
-                        .map(|(backend_name, package)| Operation {
-                            kind: OperationKind::Update,
-                            backend_name,
-                            package_ids: vec![package.id.clone()],
-                            infos: vec![package.info.clone()],
-                        })
-                        .collect()
+                    crate::operation::group_by_backend(
+                        updates
+                            .iter()
+                            .map(|(backend_name, package)| (*backend_name, package)),
+                    )
+                    .into_iter()
+                    .map(|(backend_name, packages)| Operation {
+                        kind: OperationKind::Update,
+                        backend_name,
+                        package_ids: packages.iter().map(|p| p.id.clone()).collect(),
+                        infos: packages.iter().map(|p| p.info.clone()).collect(),
+                    })
+                    .collect()
                 })
                 .unwrap_or_default();
             for op in ops {

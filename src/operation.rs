@@ -67,7 +67,41 @@ impl fmt::Display for RepositoryRemoveError {
 
 impl std::error::Error for RepositoryRemoveError {}
 
+/// Groups items per backend, keeping the order in which backends first appear.
+/// "Update all" uses this so each backend runs one transaction (and asks for
+/// authentication once) instead of one transaction per package.
+pub fn group_by_backend<T>(
+    items: impl IntoIterator<Item = (&'static str, T)>,
+) -> Vec<(&'static str, Vec<T>)> {
+    let mut groups: Vec<(&'static str, Vec<T>)> = Vec::new();
+    for (backend_name, item) in items {
+        match groups.iter_mut().find(|(name, _)| *name == backend_name) {
+            Some((_, group)) => group.push(item),
+            None => groups.push((backend_name, vec![item])),
+        }
+    }
+    groups
+}
+
 impl Operation {
+    /// "Name from Source", or "N packages from Source" for batched operations.
+    fn subject(&self) -> String {
+        let first = &self.infos[0];
+        if self.infos.len() > 1 {
+            if self
+                .infos
+                .iter()
+                .all(|info| info.source_name == first.source_name)
+            {
+                format!("{} packages from {}", self.infos.len(), first.source_name)
+            } else {
+                format!("{} packages", self.infos.len())
+            }
+        } else {
+            format!("{} from {}", first.name, first.source_name)
+        }
+    }
+
     pub fn pending_text(&self, progress: i32) -> String {
         //TODO: translate
         let verb = match &self.kind {
@@ -89,10 +123,7 @@ impl Operation {
                 );
             }
         };
-        format!(
-            "{} {} from {} ({}%)...",
-            verb, self.infos[0].name, self.infos[0].source_name, progress
-        )
+        format!("{} {} ({}%)...", verb, self.subject(), progress)
     }
 
     pub fn completed_text(&self) -> String {
@@ -108,10 +139,7 @@ impl Operation {
                 return format!("Removed repositories {:?}", RepositoryRemove::ids(rms));
             }
         };
-        format!(
-            "{} {} from {}",
-            verb, self.infos[0].name, self.infos[0].source_name
-        )
+        format!("{} {}", verb, self.subject())
     }
 
     pub fn failed_dialog(&self, err: &str) -> (String, String) {
@@ -139,12 +167,15 @@ impl Operation {
                 );
             }
         };
-        //TODO: get ids and names from all packages
+        if self.infos.len() > 1 {
+            let names: Vec<&str> = self.infos.iter().map(|info| info.name.as_str()).collect();
+            return (
+                format!("Failed to {verb} {}", self.subject()),
+                format!("Failed to {verb} {}:\n{err}", names.join(", ")),
+            );
+        }
         (
-            format!(
-                "Failed to {verb} {} from {}",
-                self.infos[0].name, self.infos[0].source_name
-            ),
+            format!("Failed to {verb} {}", self.subject()),
             format!(
                 "Failed to {verb} {} ({}) from {} ({}):\n{err}",
                 self.infos[0].name,
@@ -153,5 +184,30 @@ impl Operation {
                 self.infos[0].source_id
             ),
         )
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::group_by_backend;
+
+    #[test]
+    fn group_by_backend_batches_per_backend_in_first_seen_order() {
+        let groups = group_by_backend([
+            ("packagekit", 1),
+            ("flatpak-user", 2),
+            ("packagekit", 3),
+            ("packagekit", 4),
+            ("flatpak-user", 5),
+        ]);
+        assert_eq!(
+            groups,
+            vec![("packagekit", vec![1, 3, 4]), ("flatpak-user", vec![2, 5])]
+        );
+    }
+
+    #[test]
+    fn group_by_backend_of_nothing_is_empty() {
+        assert!(group_by_backend::<u8>([]).is_empty());
     }
 }
