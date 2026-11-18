@@ -46,23 +46,23 @@ fn extract_wayland_bitcode(element: &xmltree::Element) -> Option<WaylandCompatib
 
     // Find all value elements within custom
     for node in custom_elem.children.iter() {
-        if let xmltree::XMLNode::Element(value_elem) = node {
-            if value_elem.name == "value" {
-                // Check if this is the wayland_compat key
-                if let Some(key) = value_elem.attributes.get("key") {
-                    if key == "wayland_compat" {
-                        // Get the text content
-                        if let Some(xmltree::XMLNode::Text(text)) = value_elem.children.first() {
-                            // Parse hex string (e.g., "0x0A")
-                            let text = text.trim();
-                            if let Some(hex_str) = text.strip_prefix("0x") {
-                                if let Ok(bitcode) = u8::from_str_radix(hex_str, 16) {
-                                    log::debug!("Found wayland_compat bitcode: 0x{:02X}", bitcode);
-                                    return Some(WaylandCompatibility::decode_bitcode(bitcode));
-                                } else {
-                                    log::warn!("Failed to parse wayland_compat bitcode: {}", text);
-                                }
-                            }
+        if let xmltree::XMLNode::Element(value_elem) = node
+            && value_elem.name == "value"
+        {
+            // Check if this is the wayland_compat key
+            if let Some(key) = value_elem.attributes.get("key")
+                && key == "wayland_compat"
+            {
+                // Get the text content
+                if let Some(xmltree::XMLNode::Text(text)) = value_elem.children.first() {
+                    // Parse hex string (e.g., "0x0A")
+                    let text = text.trim();
+                    if let Some(hex_str) = text.strip_prefix("0x") {
+                        if let Ok(bitcode) = u8::from_str_radix(hex_str, 16) {
+                            log::debug!("Found wayland_compat bitcode: 0x{:02X}", bitcode);
+                            return Some(WaylandCompatibility::decode_bitcode(bitcode));
+                        } else {
+                            log::warn!("Failed to parse wayland_compat bitcode: {}", text);
                         }
                     }
                 }
@@ -730,63 +730,63 @@ impl AppstreamCache {
             .children
             .par_iter()
             .filter_map(|node| {
-                if let xmltree::XMLNode::Element(e) = node {
-                    if &*e.name == "component" {
-                        // Extract wayland_compat from custom fields before converting to Component
-                        let wayland_compat_from_xml = extract_wayland_bitcode(e);
+                if let xmltree::XMLNode::Element(e) = node
+                    && &*e.name == "component"
+                {
+                    // Extract wayland_compat from custom fields before converting to Component
+                    let wayland_compat_from_xml = extract_wayland_bitcode(e);
 
-                        match Component::try_from(e) {
-                            Ok(component) => {
-                                match component.kind {
-                                    ComponentKind::DesktopApplication => {}
-                                    ComponentKind::Addon => {
-                                        addons.lock().unwrap().push(component);
-                                        return None;
-                                    }
-                                    _ => {
-                                        // Skip anything that is not a desktop application or addon
-                                        //TODO: should we allow more components?
-                                        return None;
-                                    }
+                    match Component::try_from(e) {
+                        Ok(component) => {
+                            match component.kind {
+                                ComponentKind::DesktopApplication => {}
+                                ComponentKind::Addon => {
+                                    addons.lock().unwrap().push(component);
+                                    return None;
                                 }
-
-                                let id = AppId::new(&component.id.0);
-                                let monthly_downloads = 0;
-
-                                // Use bitcode from XML if available
-                                let wayland_compat = wayland_compat_from_xml;
-
-                                if wayland_compat_from_xml.is_some() {
-                                    log::debug!(
-                                        "Using wayland_compat from AppStream XML for {}",
-                                        component.id.0
-                                    );
+                                _ => {
+                                    // Skip anything that is not a desktop application or addon
+                                    //TODO: should we allow more components?
+                                    return None;
                                 }
-
-                                return Some((
-                                    id,
-                                    Arc::new(AppInfo::new(
-                                        &self.source_id,
-                                        &self.source_name,
-                                        origin_opt.map(|x| x.as_str()),
-                                        component,
-                                        &self.locale,
-                                        monthly_downloads,
-                                        false,
-                                        wayland_compat,
-                                    )),
-                                ));
                             }
-                            Err(err) => {
-                                // Unsupported component types (for example web apps) are expected.
+
+                            let id = AppId::new(&component.id.0);
+                            let monthly_downloads = 0;
+
+                            // Use bitcode from XML if available
+                            let wayland_compat = wayland_compat_from_xml;
+
+                            if wayland_compat_from_xml.is_some() {
                                 log::debug!(
-                                    "skipping component {:?} in {:?}: {}",
-                                    e.get_child("id")
-                                        .and_then(|x| appstream::AppId::try_from(x).ok()),
-                                    path,
-                                    err
+                                    "Using wayland_compat from AppStream XML for {}",
+                                    component.id.0
                                 );
                             }
+
+                            return Some((
+                                id,
+                                Arc::new(AppInfo::new(
+                                    &self.source_id,
+                                    &self.source_name,
+                                    origin_opt.map(|x| x.as_str()),
+                                    component,
+                                    &self.locale,
+                                    monthly_downloads,
+                                    false,
+                                    wayland_compat,
+                                )),
+                            ));
+                        }
+                        Err(err) => {
+                            // Unsupported component types (for example web apps) are expected.
+                            log::debug!(
+                                "skipping component {:?} in {:?}: {}",
+                                e.get_child("id")
+                                    .and_then(|x| appstream::AppId::try_from(x).ok()),
+                                path,
+                                err
+                            );
                         }
                     }
                 }
@@ -866,8 +866,8 @@ impl AppstreamCache {
             .filter_map(|value| {
                 // Sanitize categories in YAML before deserialization
                 let mut sanitized_value = value.clone();
-                if let Some(categories) = sanitized_value.get_mut("Categories") {
-                    if let Some(cat_seq) = categories.as_sequence_mut() {
+                if let Some(categories) = sanitized_value.get_mut("Categories")
+                    && let Some(cat_seq) = categories.as_sequence_mut() {
                         for cat in cat_seq.iter_mut() {
                             if let Some(cat_str) = cat.as_str() {
                                 let cleaned =
@@ -876,7 +876,6 @@ impl AppstreamCache {
                             }
                         }
                     }
-                }
 
                 match Component::deserialize(&sanitized_value) {
                     Ok(mut component) => {
@@ -1214,8 +1213,7 @@ impl AppstreamCache {
                                     let mut images = Vec::new();
                                     if let Some(source_image) =
                                         screenshot.get("source-image").and_then(|x| x.as_mapping())
-                                    {
-                                        if let Some(path_str) = source_image["url"].as_str() {
+                                        && let Some(path_str) = source_image["url"].as_str() {
                                             let url_str = match &media_base_url_opt {
                                                 Some(media_base_url) => {
                                                     //TODO: join using url crate?
@@ -1241,7 +1239,6 @@ impl AppstreamCache {
                                                 }
                                             }
                                         }
-                                    }
 
                                     //TODO: thumbnails
 

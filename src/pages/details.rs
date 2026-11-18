@@ -117,12 +117,12 @@ impl DetailsPage {
         let buttons = actions.selected_buttons(self.backend_name, &self.id, &self.info, false);
 
         let mut title_row_children = vec![widget::text::title2(&self.info.name).into()];
-        if self.info.source_id == "flathub" {
-            if let Some(badge) = wayland_compat_badge(&self.info, 24, app_stats) {
-                title_row_children
-                    .push(widget::Space::with_width(Length::Fixed(space_xs.into())).into());
-                title_row_children.push(badge);
-            }
+        if self.info.source_id == "flathub"
+            && let Some(badge) = wayland_compat_badge(&self.info, 24, app_stats)
+        {
+            title_row_children
+                .push(widget::Space::with_width(Length::Fixed(space_xs.into())).into());
+            title_row_children.push(badge);
         }
 
         column = column.push(
@@ -259,49 +259,47 @@ impl DetailsPage {
         }
         column = column.push(widget::text::body(&self.info.description));
 
-        if self.info.source_id == "flathub" {
-            if let Some(compat) = self.info.wayland_compat_lazy() {
-                if compat.risk_level == RiskLevel::Critical || compat.risk_level == RiskLevel::High
-                {
-                    let (title, description, icon_name) =
-                        if matches!(compat.support, WaylandSupport::X11Only) {
-                            (
-                                fl!("compatibility-warning"),
-                                fl!("x11-only-description"),
-                                "dialog-warning-symbolic",
-                            )
-                        } else {
-                            let framework_name = match compat.framework {
-                                AppFramework::QtWebEngine => fl!("framework-qtwebengine"),
-                                AppFramework::Electron => fl!("framework-electron"),
-                                _ => fl!("wayland-issues-warning"),
-                            };
-                            (
-                                fl!("wayland-issues-warning"),
-                                fl!("wayland-issues-description", framework = framework_name),
-                                "dialog-warning-symbolic",
-                            )
-                        };
-
-                    let warning_container = widget::container(
-                        widget::column::with_children(vec![
-                            widget::row::with_children(vec![
-                                widget::icon::from_name(icon_name).size(24).into(),
-                                widget::text::heading(title).width(Length::Fill).into(),
-                            ])
-                            .spacing(space_s)
-                            .into(),
-                            widget::text::body(description).into(),
-                        ])
-                        .spacing(space_xxs),
+        if self.info.source_id == "flathub"
+            && let Some(compat) = self.info.wayland_compat_lazy()
+            && (compat.risk_level == RiskLevel::Critical || compat.risk_level == RiskLevel::High)
+        {
+            let (title, description, icon_name) =
+                if matches!(compat.support, WaylandSupport::X11Only) {
+                    (
+                        fl!("compatibility-warning"),
+                        fl!("x11-only-description"),
+                        "dialog-warning-symbolic",
                     )
-                    .padding(space_s)
-                    .class(theme::Container::Card);
+                } else {
+                    let framework_name = match compat.framework {
+                        AppFramework::QtWebEngine => fl!("framework-qtwebengine"),
+                        AppFramework::Electron => fl!("framework-electron"),
+                        _ => fl!("wayland-issues-warning"),
+                    };
+                    (
+                        fl!("wayland-issues-warning"),
+                        fl!("wayland-issues-description", framework = framework_name),
+                        "dialog-warning-symbolic",
+                    )
+                };
 
-                    column = column.push(warning_container);
-                    column = column.push(widget::Space::with_height(Length::Fixed(space_s.into())));
-                }
-            }
+            let warning_container = widget::container(
+                widget::column::with_children(vec![
+                    widget::row::with_children(vec![
+                        widget::icon::from_name(icon_name).size(24).into(),
+                        widget::text::heading(title).width(Length::Fill).into(),
+                    ])
+                    .spacing(space_s)
+                    .into(),
+                    widget::text::body(description).into(),
+                ])
+                .spacing(space_xxs),
+            )
+            .padding(space_s)
+            .class(theme::Container::Card);
+
+            column = column.push(warning_container);
+            column = column.push(widget::Space::with_height(Length::Fixed(space_s.into())));
         }
 
         if !self.addons.is_empty() {
@@ -338,14 +336,14 @@ impl DetailsPage {
                 "version",
                 version = release.version.as_str()
             )));
-            if let Some(timestamp) = release.timestamp {
-                if let Some(utc) = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0) {
-                    let local = chrono::DateTime::<chrono::Local>::from(utc);
-                    release_col = release_col.push(widget::text::body(format!(
-                        "{}",
-                        local.format("%b %-d, %-Y")
-                    )));
-                }
+            if let Some(timestamp) = release.timestamp
+                && let Some(utc) = chrono::DateTime::<chrono::Utc>::from_timestamp(timestamp, 0)
+            {
+                let local = chrono::DateTime::<chrono::Local>::from(utc);
+                release_col = release_col.push(widget::text::body(format!(
+                    "{}",
+                    local.format("%b %-d, %-Y")
+                )));
             }
             if let Some(description) = &release.description {
                 release_col = release_col.push(widget::text::body(description));
@@ -427,11 +425,11 @@ impl DetailsPage {
                 Task::none()
             }
             Message::SelectedScreenshot(i, url, data) => {
-                if let Some(screenshot) = self.info.screenshots.get(*i) {
-                    if screenshot.url == *url {
-                        self.screenshot_images
-                            .insert(*i, widget::image::Handle::from_bytes(data.clone()));
-                    }
+                if let Some(screenshot) = self.info.screenshots.get(*i)
+                    && screenshot.url == *url
+                {
+                    self.screenshot_images
+                        .insert(*i, widget::image::Handle::from_bytes(data.clone()));
                 }
                 Task::none()
             }

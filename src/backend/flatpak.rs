@@ -460,10 +460,8 @@ impl Backend for Flatpak {
                         tx.add_uninstall(r_str)?;
 
                         // If purge_data is requested, collect app IDs for later deletion
-                        if *purge_data {
-                            if let Some(app_id) = r.name() {
-                                app_ids_to_purge.push(app_id.to_string());
-                            }
+                        if *purge_data && let Some(app_id) = r.name() {
+                            app_ids_to_purge.push(app_id.to_string());
                         }
                     }
                 }
