@@ -22,7 +22,14 @@ jobs:
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y xvfb x11-utils xdotool imagemagick dbus-x11 mesa-vulkan-drivers libgl1-mesa-dri build-essential dpkg-dev desktop-file-utils python3-xlib appstream gnome-software pkg-config apt-config-icons apt-config-icons-hidpi apt-config-icons-large apt-config-icons-large-hidpi adwaita-icon-theme libflatpak-dev libssl-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev libegl1-mesa-dev
-          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
+          # The smoke tests search Ubuntu's AppStream catalog (DEP-11), so fetch it even
+          # when the runner image disables that index target.
+          apt-config dump | grep -i dep-11 || true
+          sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 -o Acquire::IndexTargets::deb::DEP-11::DefaultEnabled=true update
+          if ! ls /var/lib/apt/lists/*dep11_Components-amd64.yml* >/dev/null 2>&1; then
+            echo "::error::Ubuntu's AppStream catalog (DEP-11) was not downloaded; the store smoke tests need it."
+            exit 1
+          fi
 
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
