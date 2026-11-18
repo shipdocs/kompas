@@ -18,7 +18,7 @@ jobs:
       - uses: actions/checkout@v4
       
       - name: Install native and X11 test dependencies
-        timeout-minutes: 6
+        timeout-minutes: 15
         run: |
           sudo apt-get -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 update
           sudo apt-get -o DPkg::Lock::Timeout=120 -o Acquire::Retries=2 -o Acquire::http::Timeout=30 -o Acquire::https::Timeout=30 install -y xvfb x11-utils xdotool imagemagick dbus-x11 mesa-vulkan-drivers libgl1-mesa-dri build-essential dpkg-dev desktop-file-utils python3-xlib appstream gnome-software pkg-config apt-config-icons apt-config-icons-hidpi apt-config-icons-large apt-config-icons-large-hidpi adwaita-icon-theme libflatpak-dev libssl-dev libxkbcommon-dev libxkbcommon-x11-dev libwayland-dev libfontconfig1-dev libegl1-mesa-dev
